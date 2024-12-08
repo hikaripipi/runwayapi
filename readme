@@ -1,0 +1,325 @@
+API Reference
+Start generating
+These endpoints all kick off tasks to create generations.
+
+Generate a video from an image
+POST
+/v1/image_to_video
+This endpoint will start a new task to generate a video from an image prompt.
+
+Authentication
+Authorization
+Use the HTTP Authorization header with the Bearer scheme along with an API key.
+
+Headers
+X-Runway-Version
+Required
+string
+This field must be set to the exact value 2024-11-06.
+
+Request body
+promptImage
+Required
+string or Array of PromptImages (objects)
+string <uri>
+A HTTPS URL or data URI containing an encoded image to be used as the first frame of the generated video. See our docs on image inputs for more information.
+
+Array of objects
+An array of objects representing images to be used in the output video. No two provided images may have the same position value.
+
+uri
+Required
+string
+<uri>
+A HTTPS URL or data URI containing an encoded image. See our docs on image inputs for more information.
+
+position
+Required
+string
+Accepted values:
+"first"
+"last"
+The position of the image in the output video. "first" will use the image as the first frame of the video, "last" will use the image as the last frame of the video.
+
+model
+Required
+string
+Accepted value:
+"gen3a_turbo"
+The model variant to use.
+
+seed
+integer
+[ 0 .. 4294967295 ]
+If unspecified, a random number is chosen. Varying the seed integer is a way to get different results for the same other request parameters. Using the same seed integer for an identical request will produce similar results.
+
+promptText
+string
+<= 512 characters
+A non-empty string up to 512 UTF-16 code points in length (that is, promptText.length === 512 in JavaScript). This should describe in detail what should appear in the output.
+
+watermark
+boolean
+Default:
+false
+A boolean indicating whether or not the output video will contain a Runway watermark.
+
+duration
+integer
+Default:
+10
+Accepted values:
+5
+10
+The number of seconds of duration for the output video.
+
+ratio
+string
+Accepted values:
+"1280:768"
+"768:1280"
+The resolution of the output video.
+
+Responses
+200
+The task has been successfully created.
+
+429
+You have exceeded the rate limit for this endpoint.
+
+Node SDK
+Python SDK
+cURL
+fetch()
+httpx
+
+# pip install runwayml
+
+from runwayml import RunwayML
+
+# The env var RUNWAYML_API_SECRET is expected to contain your API key.
+
+client = RunwayML()
+
+task = client.image_to_video.create(
+model='gen3a_turbo',
+prompt_image='https://example.com/assets/bunny.jpg',
+prompt_text='The bunny is eating a carrot',
+)
+print(task.id)
+200
+
+{
+"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08"
+}
+Task management
+Endpoints for managing tasks that have been submitted.
+
+Get task detail
+GET
+/v1/tasks/{id}
+Return details about a task. Consumers of this API should not expect updates more frequent than once every five seconds for a given task.
+
+Authentication
+Authorization
+Use the HTTP Authorization header with the Bearer scheme along with an API key.
+
+Path parameters
+id
+Required
+string
+<uuid>
+The ID of a previously-submitted task that has not been canceled or deleted.
+
+Headers
+X-Runway-Version
+Required
+string
+This field must be set to the exact value 2024-11-06.
+
+Responses
+200
+The task status.
+
+404
+The task does not exist, or was deleted or canceled.
+
+Node SDK
+Python SDK
+cURL
+fetch()
+httpx
+
+# pip install runwayml
+
+from runwayml import RunwayML
+
+# The env var RUNWAYML_API_SECRET is expected to contain your API key.
+
+client = RunwayML()
+
+task = client.tasks.retrieve(id='17f20503-6c24-4c16-946b-35dbbce2af2f')
+print(task)
+200
+
+An example of a pending task
+An example of a pending task
+{
+"id": "17f20503-6c24-4c16-946b-35dbbce2af2f",
+"status": "PENDING",
+"createdAt": "2024-06-27T19:49:32.334Z"
+}
+Cancel or delete a task
+DELETE
+/v1/tasks/{id}
+Tasks that are running, pending, or throttled can be canceled by invoking this method. Invoking this method for other tasks will delete them.
+
+The output data associated with a deleted task will be deleted from persistent storage in accordance with our data retention policy. Aborted and deleted tasks will not be able to be fetched again in the future.
+
+Authentication
+Authorization
+Use the HTTP Authorization header with the Bearer scheme along with an API key.
+
+Path parameters
+id
+Required
+string
+<uuid>
+The ID of a previously-submitted task that has not been canceled or deleted.
+
+Headers
+X-Runway-Version
+Required
+string
+This field must be set to the exact value 2024-11-06.
+
+Responses
+204
+This endpoint will produce a 204 No Content response indicating successful cancellation or deletion. Calling this endpoint for tasks which have already been deleted or aborted will result in a 404: for idempotency purposes, it is safe to ignore these 404 errors.
+
+Node SDK
+Python SDK
+cURL
+fetch()
+httpx
+
+# pip install runwayml
+
+from runwayml import RunwayML
+
+# The env var RUNWAYML_API_SECRET is expected to contain your API key.
+
+client = RunwayML()
+
+client.tasks.delete(id='17f20503-6c24-4c16-946b-35dbbce2af2f')
+
+nputs
+When starting tasks through the Runway API, you’ll often need to provide assets like images. Some restrictions exist for what you can provide.
+
+Assets can be provided via URLs or Data URIs.
+
+URLs
+In all cases, URLs must meet some basic minimum requirements:
+
+All URLs must be HTTPS.
+URLs must reference a domain name, not an IP address.
+The server should respond with valid Content-Type and Content-Length headers.
+Redirects are not followed. If the URL returns a 3XX response code, the request is considered failed.
+The length of any single URL should not exceed 2048 characters.
+Additionally, the server responding to the request must support HTTP HEAD requests.
+
+Content-Types
+When specifying a URL, the Content-Type response header must be specified, and it must match the media type of your asset. File extensions in URLs are not considered. The Content-Types that are supported are listed below for the supported asset types.
+
+Be aware that application/octet-stream and other generic values are explicitly not supported.
+
+User agent
+Runway will use a User-Agent header that starts with RunwayML API/ when making requests to your server. If you use a scraping-prevention tool or WAF, be sure to allowlist our user agent string prefix.
+
+Data URIs (base64 encoded images)
+A data URI allows you to pass the base64 encoded images as part of a request to our API, rather than passing a URL to the asset hosted on another server. This can reduce the complexity of your integration by eliminating an upload step.
+
+Data URIs are supported anywhere URLs are expected. However, they come with some restrictions:
+
+The length of the encoded data URI must be under 5MB (1024 × 1024 × 5 bytes). Keep in mind that base64-encoding your asset increases its size by about 33%: this means that you may not be able to use data URIs with assets larger than about 3.3MB. This limit supersedes type-specific file size limits.
+The data URI must include an appropriate content type string. For instance, your data URI should start with something like data:image/jpg;base64,.
+If a data URI is not base64 encoded, it may not be accepted.
+
+Considerations
+If you do not already have your asset stored in object storage, submitting your asset with a data URI can save you a step. Using a data URI may also help to reduce the latency of API calls.
+
+However, the 3MB limit may be too small for some assets, especially for video. If you cannot be sure that all assets are safely within the 2.2MB un-encoded size limit, you should upload assets to object storage instead.
+
+Type-specific requirements
+Images
+For fields that accept images, the asset referenced by the URL must use one of the following codecs, along with the corresponding Content-Type header:
+
+Codec Content-Type header
+JPEG image/jpg or image/jpeg
+PNG image/png
+WebP image/webp
+All images are limited to 16MB.
+
+Aspect ratios and auto-cropping
+Gen-3 Alpha Turbo returns either 1280x768 or 768x1280 outputs. If your input asset is not exactly of this ratio, the model will auto-crop your asset from the center to the aspect ratio parameter provided.
+
+Troubleshooting assets
+When submitting an asset, the API may return a 400 Bad Request response if the asset cannot be used. If you’re using SDKs, a BadRequestError will be thrown in Node or raised in Python.
+
+The message in the error response body will include two pieces of pertinent information: the field that the error occurred for (e.g., promptImage) and the reason for the failure.
+
+Common error reasons
+Invalid data URI.
+The provided data URI is malformed and could not be parsed. Be sure you're using a library to encode the URI.
+Unsupported asset type. Data URIs must include the content type of the value they encode.
+Your data URI specifies a media type that's not supported. See the list of supported media types above.
+Invalid URL
+You provided a URL that is non-standard and cannot be parsed.
+Only HTTPS URLs are allowed.
+All URLs must start with https://. You cannot use http:// or other schemes, like ftp://.
+URLs must be hosted on a domain.
+You cannot provide a URL that points to an IP address. For instance, https://11.22.33.44/foo/bar would be rejected. You can instead create an A or AAAA record for your domain that points at the IP address of your host (in the example here, an A record pointing to 11.22.33.44). Be sure to set up HTTPS on the host for that record.
+Failed to fetch asset. The URL may be incorrect or the server hosting the asset may be down.
+When we attempted to fetch the asset, we encountered a non-HTTP connection issue. This might be a DNS issue, TCP connection issue, TLS problem, protocol error, or an unexpectedly closed connection. Check that the URL is working and that connections are not being rejected.
+Failed to fetch asset. Received HTTP response code "..."
+When we attempted to fetch the asset, we did not get a 200 status code. The resposne code that we received is provided in the reason. Be aware that we do not follow redirects (via the Location HTTP response header).
+Timeout while fetching asset.
+It took longer than ten seconds to download the provided asset.
+Assets must use an approved Content-Type response header. We received application/octet-stream, which is not allowed.
+Your server returned application/octet-stream for the Content-Type HTTP response header. This is not allowed. See the list of supported media types above.
+Unsupported Content-Type response header: "...".
+Your server returned an unsupported value for the Content-Type HTTP response header, which is noted in the response. See the list of supported media types above.
+Content-Length not provided
+Your server did not specify a Content-Length HTTP response header. Lengths must be provided; we do not support streaming responses of unknown length.
+Asset size exceeds XX.XMB.
+Your server specified a Content-Length HTTP response header that exceeds the maximum size for the asset type. This error may also be returned if the number of bytes returned by the server does not match the number specified in the Content-Length response header. The maximum size is specified in the reason and in the documentation above.
+Asset size exceeds XX.XMB.
+Your server specified a Content-Length HTTP response header that exceeds the maximum size for the asset type. The maximum size is specified in the reason.
+Invalid asset dimensions. Height and width must not exceed 8000px. Got XXxYY.
+The provided asset is larger than 8000px on one of its sides. Assets must be less than 8000px on either side.
+Invalid asset aspect ratio. width / height ratio must be between XX and YY. Got ZZ.
+The aspect ratio (the asset width divided by the asset height) must be between the values XX and YY. The computed aspect ratio is included in the reason as ZZ.
+Debugging failures
+You can investigate the cause(s) for many common failures by simulating our request for your asset. To do this, we’ll run a cURL command against the URL you’ll specify for your asset. For this example, we’ll use the asset URL https://example.com/assets/image.jpg.
+
+Terminal window
+curl "https://example.com/assets/image.jpg" \
+ -I \
+ -H "User-Agent: RunwayML API/1.0"
+
+You’ll receive output that looks like this:
+
+% curl "https://example.com/assets/image.jpg" \
+ -I \
+ -H "User-Agent: RunwayML API/1.0"
+HTTP/2 200
+content-type: image/jpg
+content-length: 123456
+vary: Accept-Encoding
+cache-control: max-age=14400
+accept-ranges: bytes
+alt-svc: h3=":443"; ma=86400
+
+Your server should be returning a 200 status code.
+Be sure you’re returning an acceptable Content-Type.
+A Content-Length should be provided with an accurate file size.
